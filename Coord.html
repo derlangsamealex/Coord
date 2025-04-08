@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<link href="style.css" rel="stylesheet">
+    </head>
+    <body>
+    <div id="menu">
+      <nav>
+        <ul id="nav">
+          <li class="dropdown" onmouseleave=closesubmenu(this)>
+            <a onmouseover=opensubmenu(this)>Data</a>
+            <ul>
+            </ul>
+          </li>
+          <li class="dropdown" onmouseleave=closesubmenu(this)>
+            <a onmouseover=opensubmenu(this)>Edit</a>
+            <ul>
+              <li onclick=coord.move(this)><a>Move</a></li>
+              <li class="dropdown" onmouseleave=closesubmenu(this)>
+                <a onmouseover=opensubmenu(this)>Edit Element</a>
+                <ul> 
+                  <li onclick=coord.setLine(this)><a>Line</a></li>
+                  <li onclick=coord.setCircle(this)><a>Circle</a></li>
+                  <li onclick=coord.setPolygon(this)><a>Polygon</a></li>                   
+                </ul>
+              </li>
+              <li class="dropdown" onmouseleave=closesubmenu(this)>
+                <a onmouseover=opensubmenu(this)>Interactiv</a>
+                <ul>
+                  <li onclick=coord.setSpiral(this)><a>Spiral</a></li>                                                      
+                </ul>
+              </li>
+              <li><a onclick=coord.undo(this)>Undo</a></li>
+              <li><a onclick=coord.pickElement(this)>Pick Element</a></li>              
+              <li><a onclick=coord.deleteElement(this)>Delete</a></li>
+              <li><a onclick=coord.clear(this)>Clear</a></li>              
+            </ul>
+          </li>
+          <li class="dropdown"> 
+            <a id="zoom" style="background:white; color:black;">1:1</a>
+          </li>
+          <li class="dropdown"> 
+            <a id="grid" style="background:white; color:black;">Grid Dimension: 10</a>
+          </li>
+          <li>
+            <button onclick=coord.gridDimensionUp()>↑</button>
+          </li>
+          <li>
+            <button onclick=coord.gridDimensionDown()>↓</button>
+          </li>          
+        </ul>
+      </nav>       
+    </body>
+    <script>
+function opensubmenu(event) {
+  event.nextElementSibling.style.display = "block";
+}
+function closesubmenu(event) {
+  event.children[1].style.display = "none";  
+}    
+function SvgElement(str,obj) {
+  let output=document.createElementNS("http://www.w3.org/2000/svg",str);
+  for(prop in obj) {
+    output.setAttribute(prop, obj[prop]);
+  }
+  return output;
+}
+function svgChgProp(target,obj) {
+  for(prop in obj) {
+    target.setAttribute(prop, obj[prop]);
+  }
+}
+function HTMLElement(str, obj) {
+    let output = document.createElement(str);
+    for(let prop in obj) {
+        output.style[prop] = obj[prop];
+    }
+    return output;
+}
+function calcDirection(dx,dy) {
+  if(dx == 0 && dy == 0) {
+    return 0;
+  }
+  if(dx >= 0 && dy >= 0) {
+    return Math.PI - Math.atan(Math.abs(dx / dy));
+  }
+  if(dx >= 0 && dy < 0) {
+    return Math.atan(Math.abs(dx / dy));
+  }
+  if(dx < 0 && dy < 0) {
+    return 2 * Math.PI - Math.atan(Math.abs(dx / dy));
+  }
+  if(dx < 0 && dy >= 0) {
+    return Math.PI + Math.atan(Math.abs(dx / dy));
+  }
+} 
+Menu = function(parent) {
+  this.surface = HTMLElement('div',{
+    position: 'absolute',
+    left: 0,
+    top: '75%',
+    width: '100%',
+    height: '25%',
+    backgroundColor: "grey",
+  });  
+  document.body.appendChild(this.surface);
+  this.textarea = HTMLElement('textarea', {
+    position: 'absolute',
+    left: "50%",
+    top: '20%',
+    width: '45%',
+    height: '60%',
+    "font-size": "10px",
+    resize: "none"
+  });
+  this.textarea.readOnly = true;
+  this.textarea.value = "move";
+  this.surface.appendChild(this.textarea);
+  this.buildPolygonMenu = function() {
+    this.upButton = new HTMLElement("button", {
+      position: "absolute",
+      left: "4%",
+      top: "30%",
+      width: "8%",
+      height: "10%",
+      "font-size": "10px",
+      border: "1px groove black"
+    });
+    this.surface.appendChild(this.upButton);
+    this.upButton.innerHTML = "↑";
+this.downButton = new HTMLElement("button", {
+      position: "absolute",
+      left: "12%",
+      top: "30%",
+      width: "8%",
+      height: "10%",
+      "font-size": "10px",
+      border: "1px groove black"
+    });
+    this.surface.appendChild(this.downButton);
+    this.downButton.innerHTML = "↓";      
+    this.valueBox = new HTMLElement("div", {
+      position: "absolute",
+      left: "20%",
+      top: "30%",
+      width: "15%",
+      height: "10%",
+      "font-size": "10px",
+      backgroundColor: "white",
+      border: "1px groove black"
+    });
+    this.surface.appendChild(this.valueBox);
+    this.valueBox.innerHTML = "corners: " + 4;
+  }
+  this.buildSpiralMenu = function() {
+    this.pickedSpiral = "normal";    
+    this.spiral = [];
+    this.startButton = HTMLElement("button", {
+      position: "absolute",
+      left: "28%",
+      top: "30%",
+      width: "20%",
+      height: "15%",
+    });
+    parent.menu.surface.appendChild(this.startButton);
+    this.startButton.innerHTML = "start";
+    this.stopButton = HTMLElement("button", {
+      position: "absolute",
+      left: "28%",
+      top: "50%",
+      width: "20%",
+      height: "15%",
+    });
+    parent.menu.surface.appendChild(this.stopButton);
+    this.stopButton.innerHTML = "stop"  
+    for(let i = 0; i <= 3; i++) {
+      this.spiral[i] = HTMLElement("div", {
+        position: "absolute",
+        left: "5%",
+        top: `${30 + 16 * i}%`,
+        width: "20%",
+        height: "15%",
+      });
+      this.spiral[i].className = "menuButton";
+      parent.menu.surface.appendChild(this.spiral[i]);
+      this.spiral[i].addEventListener("click", this);
+	  innerWidth >= 500 ? this.spiral[i].style.fontSize = "10px" : null;
+    }
+    this.spiral[0].innerHTML = "normal spiral";
+    this.spiral[0].value = "normal";
+    this.spiral[1].innerHTML = "positive exponentiell spiral";
+    this.spiral[1].value = "posExp";
+    this.spiral[2].innerHTML = "negative exponentiell spiral";
+    this.spiral[2].value = "negExp";
+    this.spiral[3].innerHTML = "fibonacci";
+    this.spiral[3].value = "fibonacci";
+    this.spiral[0].style.border = "1px ridge red";
+    this.handleEvent = function() {
+      switch(event.type) {
+        case "click":
+          event.target.style.border = "1px ridge red";
+          this.pickedSpiral = event.target.value;
+          for(let i = 0; i <= 3; i++) {
+            if(this.spiral[i] !== event.target) {
+              this.spiral[i].style.border = "1px ridge grey";
+            }
+          }
+        break;
+      }
+    }          
+  }
+  this.addSpiralClickEvent = function() {
+    this.startButton.addEventListener("click", parent.pickedElement.start.bind(parent.pickedElement));
+    this.stopButton.addEventListener("click", parent.pickedElement.stop.bind(parent.pickedElement));
+  }
+  this.addPolygonClickEvent = function() {
+    this.upButton.addEventListener("click", parent.pickedElement.up.bind(parent.pickedElement));
+    this.downButton.addEventListener("click", parent.pickedElement.down.bind(parent.pickedElement));
+  }
+  this.showPolygonMenu = function() {
+    this.upButton.style.display = "block";
+    this.downButton.style.display = "block";
+    this.valueBox.style.display = "block";      
+  }
+  this.showSpiralMenu = function() {
+   this.startButton.style.display = "block";
+    this.stopButton.style.display = "block";
+    for(let i = 0; i <= 3; i++) {
+      this.spiral[i].style.display = "block";  
+    }    
+  }
+  this.hideMenu = function() {
+    this.startButton.style.display = "none";
+    this.stopButton.style.display = "none";
+    for(let i = 0; i <= 3; i++) {
+      this.spiral[i].style.display = "none";  
+    }          
+    this.upButton.style.display = "none";
+    this.downButton.style.display = "none";
+    this.valueBox.style.display = "none";
+  }
+}
+Coord = function(left, top, width, height) {
+  const menuHeight = document.getElementById("nav").getBoundingClientRect().height / innerHeight;
+  this.left = left;
+  this.top = top;
+  this.width = width;
+  this.height = height;
+  this.zoom = 1;  
+  this.gridDimension = 10;
+  this.element = "none";
+  this.menu = new Menu(this);
+  this.menu.buildPolygonMenu();
+  this.menu.buildSpiralMenu();
+  this.menu.hideMenu();
+  this.gridDimensionText = document.getElementById("grid")
+  this.pickedElement = {
+    value: "none"
+  }
+  this.surface = new HTMLElement('div',{
+    position: 'absolute',
+    left: 0,
+    top: menuHeight * 100 + "%",
+    height: '75%',
+    width: "100%",
+    backgroundColor: 'black',
+    overflow: 'auto',
+  });
+  document.body.appendChild(this.surface);
+  this.gridLength = 20; 
+  this.svg = new SvgElement("svg", {
+    left: 0,
+    top: 0,
+    width: this.width,
+    height: this.height
+  });    
+  this.surface.appendChild(this.svg);
+  this.surface.scrollLeft = this.width / 2 - innerWidth / 2;
+  this.surface.scrollTop = this.height / 2 - innerHeight / 2;
+  this.setPoint = function(x, y) {
+    this.point = new SvgElement("circle", {
+      cx: x,
+      cy: y,
+      r: 1,
+      fill: "red"
+    });
+    this.svg.appendChild(this.point);    
+  }
+  this.deletePoint = function() {
+    this.point ? this.point.remove() : null;  
+  }
+  this.move = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "none";
+    event.parentElement.style.display = "none";     
+    this.menu.textarea.value = "Move"; 
+  }
+  this.setLine = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "line";
+    event.parentElement.parentElement.parentElement.style.display = "none";
+    this.menu.textarea.value = "Line";
+  }
+  this.setCircle = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "circle";
+    event.parentElement.parentElement.parentElement.style.display = "none";
+    this.menu.textarea.value = "Circle";
+  }
+  this.setPolygon = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "polygon";
+    event.parentElement.parentElement.parentElement.style.display = "none";
+    this.menu.showPolygonMenu();
+    this.menu.textarea.value = "Draw a symmetric polygon and set the edges with the buttons";
+  }
+  this.setSpiral = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "spiral";
+    event.parentElement.parentElement.parentElement.style.display = "none";
+    this.menu.showSpiralMenu();
+    this.menu.textarea.value = "Set the point and start the animation. \nYou can choose how the spiral will go";
+  }
+  this.clear = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "none";
+    event.parentElement.parentElement.style.display = "none";    
+    this.menu.textarea.value = "move";  
+    while(this.svg.children.length >  this.lines) {
+      this.svg.children[this.svg.children.length - 1].remove();
+    }
+  }
+  this.pickElement = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "pickElement";
+    event.parentElement.parentElement.style.display = "none";    
+    this.menu.textarea.value = "doesn't work";
+  }
+  this.deleteElement = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "none";
+    event.parentElement.parentElement.style.display = "none";       
+    this.menu.textarea.value = "move";    
+  }
+  this.undo = function(event) {
+    if(this.pickedElement.value === "spiral") {
+      this.pickedElement.stop();
+    }
+    this.menu.hideMenu();
+    this.element = "none";
+    event.parentElement.parentElement.style.display = "none";      
+    this.menu.textarea.value = "move";
+    this.svg.children.length > this.lines ? this.svg.children[this.svg.children.length - 1].remove() : null;    
+  }
+  this.grid = function() {
+    lineX = [];
+    lineY = [];
+    for(let i = 0; i <= this.width / this.gridLength; i++) {
+      lineX[i] = new SvgElement("line",{
+        x1: i * this.gridLength,
+        x2: i * this.gridLength,
+        y1: 0,
+        y2: this.height,
+        stroke: "grey"
+      });
+      this.svg.appendChild(lineX[i])
+    }
+    for(let i = 0; i <= this.height / this.gridLength; i++) {
+      lineY[i] = new SvgElement("line",{
+        x1: 0,
+        x2: this.width,
+        y1: i * this.gridLength,
+        y2: i * this.gridLength,
+        stroke: "grey"
+      });
+      this.svg.appendChild(lineY[i])
+    }
+  } 
+  this.gridDimensionUp = function() {
+    this.gridDimension += 1;
+    this.gridDimensionText.innerHTML = "grid Dimension: " + this.gridDimension;
+  }
+  this.gridDimensionDown = function() {
+    this.gridDimension > 1 ? this.gridDimension -= 1 : null;
+    this.gridDimensionText.innerHTML = "grid Dimension: " + this.gridDimension;  
+  }
+  this.grid();
+  this.coordLineX = new SvgElement("line", {
+    x1: 0,
+    x2: this.width,
+    y1: this.height / 2,
+    y2: this.height / 2,
+    stroke: "white"
+  });
+  this.svg.appendChild(this.coordLineX);
+  this.coordLineY = new SvgElement("line", {
+    x1: this.width / 2,
+    x2: this.width / 2,
+    y1: 0,
+    y2: this.height,
+    stroke: "white"
+  });
+  this.svg.appendChild(this.coordLineY);
+  let mousedown = false;
+  let scroll = false;
+  let mousedownEvent;
+  let scrollLeft = 0;
+  let scrollTop = 0;
+  this.handleEvent = function() {
+    switch(event.type) {
+      case "touchstart":
+        touchStart = event.targetTouches;
+        let x1 = Math.round((touchStart[0].clientX / this.zoom + this.surface.scrollLeft) / this.gridDimension) * this.gridDimension;
+        let y1 = Math.round(((touchStart[0].clientY - menuHeight * innerHeight) / this.zoom + this.surface.scrollTop) / this.gridDimension) * this.gridDimension;
+        switch(this.element) {
+          case "pickElement":
+            this.surface.style.overflow = "hidden";
+            this.rect = new PickElement(this, x1, y1);            
+          break;
+          case "spiral":    
+            this.point ? this.deletePoint() : null;
+            this.setPoint(x1, y1);    
+            this.spiral = new Spiral(this, x1, y1);   
+            this.pickedElement = this.spiral;
+            this.menu.addSpiralClickEvent();
+          break;
+          case "line":
+            this.surface.style.overflow = "hidden";          
+            this.line = new Line(this, x1, y1);
+            this.pickedElement = this.line;
+          break;
+          case "circle":
+            this.surface.style.overflow = "hidden";            
+            this.circle = new Circle(this, x1, y1);
+            this.pickedElement = this.circle;
+          break;
+          case "polygon": 
+            this.surface.style.overflow = "hidden";
+            this.polygon = new Polygon(this, x1, y1);
+            this.pickedElement = this.polygon;
+            this.menu.addPolygonClickEvent();
+          break;
+        }  
+      break;
+      case "touchmove":
+        let x2 = Math.round((event.targetTouches[0].clientX / this.zoom + this.surface.scrollLeft) / this.gridDimension) * this.gridDimension;
+        let y2 = Math.round(((event.targetTouches[0].clientY - menuHeight * innerHeight) / this.zoom + this.surface.scrollTop) / this.gridDimension) * this.gridDimension;
+        switch(this.element) {
+          case "pickElement":
+            this.rect.draw(x2, y2);
+          break;
+          case "line":
+            this.line.draw(x2, y2);
+          break;
+          case "circle":
+            this.circle.draw(x2, y2);
+          break;
+          case "polygon": 
+            this.polygon.draw(x2, y2);
+          break;
+          case "none":
+            if(touchStart.length == 2) {
+              let touchStartDx = touchStart[0].clientX - touchStart[1].clientX;
+              let touchStartDy = touchStart[0].clientY - touchStart[1].clientY;
+              let dx = event.targetTouches[0].clientX - event.targetTouches[1].clientX;
+              let dy = event.targetTouches[0].clientY - event.targetTouches[1].clientY;
+              let delta = (dx ** 2 + dy ** 2) ** 0.5 / (touchStartDx ** 2 + touchStartDy ** 2) ** 0.5;
+              this.zoom *= delta ** 0.2;
+              this.surface.style.transform = `scale(${this.zoom})`;    
+              this.surface.style.width = 100 / this.zoom + "%";
+              this.surface.style.left = 50 - 50 / this.zoom + "%";
+              this.surface.style.height = 75 / this.zoom + "%";
+              this.surface.style.top = menuHeight * 100 + 37.5 - 37.5 / this.zoom + "%";
+              let zoomDiv = document.getElementById("zoom");
+              zoomDiv.innerHTML = "1:" + this.zoom.toFixed(3);
+            }
+          break;
+        }       
+      break;
+      case "touchend":
+        touchStart = [];
+        switch(this.element) {
+          case "pickElement":
+            this.surface.style.overflow = "auto";
+            this.rect.pickElements();
+            this.elements = "none";
+            this.menu.textarea.value = "move";
+          case "line":
+            this.surface.style.overflow = "auto";
+          break;
+          case "circle":
+            this.surface.style.overflow = "auto";          
+          break;
+          case "polygon":
+            this.surface.style.overflow = "auto";          
+          break;
+        }
+      break;
+      case "mousedown":
+		mousedown = true;
+		mousedownEvent = event;
+        let mx1 = Math.round((event.clientX / this.zoom + this.surface.scrollLeft) / this.gridDimension) * this.gridDimension;
+        let my1 = Math.round(((event.clientY - menuHeight * innerHeight) / this.zoom + this.surface.scrollTop) / this.gridDimension) * this.gridDimension;
+        switch(this.element) {
+		  case "none":
+			this.surface.style.cursor =  "all-scroll";
+			scrollLeft = this.surface.scrollLeft;
+			scrollTop = this.surface.scrollTop;
+		  break;
+          case "pickElement":
+            this.surface.style.overflow = "hidden";
+            this.rect = new PickElement(this, mx1, my1);            
+          break;
+          case "spiral":    
+            this.point ? this.deletePoint() : null;
+            this.setPoint(mx1, my1);    
+            this.spiral = new Spiral(this, mx1, my1);   
+            this.pickedElement = this.spiral;
+            this.menu.addSpiralClickEvent();
+          break;
+          case "line":
+            this.surface.style.overflow = "hidden";          
+            this.line = new Line(this, mx1, my1);
+            this.pickedElement = this.line;
+          break;
+          case "circle":
+            this.surface.style.overflow = "hidden";            
+            this.circle = new Circle(this, mx1, my1);
+            this.pickedElement = this.circle;
+          break;
+          case "polygon": 
+            this.surface.style.overflow = "hidden";
+            this.polygon = new Polygon(this, mx1, my1);
+            this.pickedElement = this.polygon;
+            this.menu.addPolygonClickEvent();
+          break;     
+        }     
+      break;
+      case "mousemove":
+	    if(mousedown) {
+          let mx2 = Math.round((event.clientX / this.zoom + this.surface.scrollLeft) / this.gridDimension) * this.gridDimension;
+          let my2 = Math.round(((event.clientY - menuHeight * innerHeight) / this.zoom + this.surface.scrollTop) / this.gridDimension) * this.gridDimension;
+          switch(this.element) {
+		    case "none":
+			  this.surface.scrollLeft = scrollLeft + mousedownEvent.clientX - event.clientX;
+			  this.surface.scrollTop = scrollTop + mousedownEvent.clientY - event.clientY;
+			break;
+            case "pickElement":
+              this.rect.draw(mx2, my2);
+            break;
+            case "line":
+              this.line.draw(mx2, my2);
+            break;
+            case "circle":
+              this.circle.draw(mx2, my2);
+            break;
+            case "polygon": 
+              this.polygon.draw(mx2, my2);
+            break;  
+          }
+		}
+	  break;
+	  case "mouseup":
+	    mousedown = false;
+		this.surface.style.cursor =  "auto";
+        switch(this.element) {
+          case "pickElement":
+            this.surface.style.overflow = "auto";
+            this.rect.pickElements();
+            this.elements = "none";
+            this.menu.textarea.value = "move";
+          case "line":
+            this.surface.style.overflow = "auto";
+          break;
+          case "circle":
+            this.surface.style.overflow = "auto";          
+          break;
+          case "polygon":
+            this.surface.style.overflow = "auto";          
+          break;
+        }    
+      break;
+	  case "wheel":
+        this.surface.style.overflow = "hidden";	
+        this.zoom *= 1 - (event.deltaY / 1000);
+        this.surface.style.transform = `scale(${this.zoom})`;    
+        this.surface.style.width = 100 / this.zoom + "%";
+        this.surface.style.left = 50 - 50 / this.zoom + "%";
+        this.surface.style.height = 75 / this.zoom + "%";
+        this.surface.style.top = menuHeight * 100 + 37.5 - 37.5 / this.zoom + "%";
+        let zoomDiv = document.getElementById("zoom");
+        zoomDiv.innerHTML = "1:" + this.zoom.toFixed(3);
+	  break;
+    }
+  }
+  this.surface.addEventListener("touchstart", this);
+  this.surface.addEventListener("touchmove", this);
+  this.surface.addEventListener("touchend", this);
+  this.surface.addEventListener("mousedown", this);
+  this.surface.addEventListener("mousemove", this);
+  this.surface.addEventListener("mouseup", this);
+  this.surface.addEventListener("wheel", this);
+  this.lines = this.svg.children.length;
+}
+PickElement = function(parent, x, y) {
+  this.x = x;
+  this.y = y;
+  this.rect = new SvgElement("rect", {
+    x: x,
+    y: y,
+    width: 0,
+    height: 0,
+    fill: "none",
+    stroke: "red",
+    "stroke-dasharray": "10 10"
+  });
+  parent.svg.appendChild(this.rect);
+  this.draw = function(x, y) {
+    this.x2 = x;
+    this.y2 = y;
+    if(x >= this.x) {
+      this.width = x - this.x;
+      this.x2 = this.x;
+    }
+    else {
+      this.width = this.x - x;    
+      this.x2 = this.x - this.width; 
+    }
+    if(y >= this.y) {
+      this.height = y - this.y;
+      this.y2 = this.y;
+    } 
+    else {     
+      this.height = this.y - y;
+      this.y2 = this.y - this.height;   
+    }
+    svgChgProp(this.rect, {
+      x: this.x2,
+      y: this.y2,
+      width: this.width,
+      height: this.height
+    }); 
+  }
+  this.pickElements = function() {
+    this.rect.remove(); 
+  }
+}
+Line = function(parent, x, y) {
+  this.value = "line";
+  this.line = new SvgElement("line", {
+    x1: x,
+    y1: y,
+    x2: x,
+    y2: y,
+    stroke: "white"
+  });
+  parent.svg.appendChild(this.line);
+  this.draw = function(x, y) {
+    svgChgProp(this.line, {
+      x2: x,
+      y2: y      
+    })
+  }
+}
+Circle = function(parent, x, y) {
+  this.value = "circle";
+  this.cx = x;
+  this.cy = y;
+  this.circle = new SvgElement("circle", {
+    cx: x,
+    cy: y,
+    r: 0,
+    stroke: "white",
+    fill: "none"
+  });
+  parent.svg.appendChild(this.circle);
+  this.draw = function(x, y) {
+    
+    this.r = ((this.cx - x) ** 2 + (this.cy - y) ** 2) ** 0.5;
+    svgChgProp(this.circle, {
+      r: this.r  
+    });
+  }
+}
+Polygon = function(parent, x, y) {
+  this.value = "polygon";
+  this.cx = x;
+  this.cy = y;
+  this.n = 4;
+  this.path = `M ${x} ${y}`;
+  this.polygon = new SvgElement("path", {
+    d: this.path,
+    stroke: "white",
+    fill: "none"
+  });
+  parent.svg.appendChild(this.polygon);
+  this.draw = function(x, y) {
+    if(x) {
+      this.x = x;
+      this.y = y;
+    }
+    this.r = ((this.cx - this.x) ** 2 + (this.cy - this.y) ** 2) ** 0.5;
+    this.direction = calcDirection(this.cx - this.x, this.cy - this.y)
+    this.alpha = Math.PI * 2 / this.n;
+    this.beta = ((this.n - 2) / this.n) * Math.PI;
+    this.edgeLength = this.r * Math.sin(this.alpha / 2);
+    this.path = `M ${this.cx} ${this.cy}`;
+    for(let i = 0; i <= this.n - 1; i++) {
+      let dx = Math.sin(this.direction - this.beta / 2 + this.alpha * i) * this.edgeLength * (-1);
+      let dy = Math.cos(this.direction - this.beta / 2 + this.alpha * i) * this.edgeLength;  
+      this.path += ` l ${dx} ${dy}`; 
+    }    
+    svgChgProp(this.polygon, {
+      d: this.path  
+    });
+  }
+  this.up = function() {
+    if(parent.pickedElement === this) {
+      this.n += 1;
+      this.draw();
+      parent.menu.valueBox.innerHTML = "corners: " + this.n;
+    }
+  }
+  this.down = function() {
+    if(parent.pickedElement === this) {
+      this.n > 3 ? this.n -= 1 : null;
+      this.draw();
+      parent.menu.valueBox.innerHTML = "corners: " + this.n;
+    }
+  }
+}
+Spiral = function(parent, x, y) {
+  this.value = "spiral";
+  this.step = 1;
+  this.deg = 1;
+  this.r = 1;
+  this.r1 = 1;
+  this.rExp = 1;
+  this.steps = 0;
+  this.degX = 0;
+  this.degY = 0;  
+  this.path = `M ${x} ${y}`;
+  this.spiralSvg = new SvgElement("path", {
+    d: this.path,
+    stroke: "white",
+    fill: "none"
+  });
+  parent.svg.appendChild(this.spiralSvg);     
+  this.start = function() {
+    parent.deletePoint();   
+    parent.element = "none";
+    parent.pickedElement === this ? this.t1 = setInterval(this.animation.bind(this), 5) : null;   
+  }
+  this.stop = function() {
+    clearInterval(this.t1);
+  }
+  this.animation = function() {
+    let x, y;
+    if(this.deg == 1 || this.deg == 3) {
+      x = this.r * Math.sin(this.steps * Math.PI / 180);
+      y = (this.r ** 2 - x ** 2) ** 0.5;
+    }
+    if(this.deg==2 || this.deg==4) {
+      y = this.r * Math.sin(this.steps * Math.PI / 180);
+      x = (this.r ** 2 - y ** 2) ** 0.5;  
+    }
+    this.steps += this.step;
+    switch(parent.menu.pickedSpiral) {
+      case "normal":  
+        this.r += 0.01;
+        if(this.steps == 90) {
+          this.degX = (-1) ** Math.floor(((this.deg) +2 ) / 2);
+          this.degY = (-1) ** Math.floor(((this.deg) + 3) / 2);
+          this.deg++;  
+          this.deg == 5 ? this.deg = 1 : this.deg = this.deg;  
+          this.steps = 0;  
+        }
+      break;
+      case "posExp":
+        this.r += this.rExp / 100;
+        this.rExp *= 1.001;
+        if(this.steps == 90) {
+          this.degX = (-1) ** Math.floor(((this.deg) +2 ) / 2);
+          this.degY = (-1) ** Math.floor(((this.deg) + 3) / 2);
+          this.deg++;  
+          this.deg == 5 ? this.deg = 1 : this.deg = this.deg;  
+          this.steps = 0;  
+        }        
+      break;
+      case "negExp":
+        this.r += this.rExp / 100;
+        this.rExp /= 1.001;
+        if(this.steps == 90) {
+          this.degX = (-1) ** Math.floor(((this.deg) +2 ) / 2);
+          this.degY = (-1) ** Math.floor(((this.deg) + 3) / 2);
+          this.deg++;  
+          this.deg == 5 ? this.deg = 1 : this.deg = this.deg;  
+          this.steps = 0;  
+        }
+      break;
+      case "fibonacci":
+        if(this.steps == 90) {
+          this.degX = (-1) ** Math.floor(((this.deg) + 2) / 2);
+          this.degY = (-1) ** Math.floor(((this.deg) + 3) / 2);
+          this.deg++;  
+          this.deg == 5 ? this.deg = 1 : this.deg = this.deg;
+          this.r += this.r1;  
+          this.r1 = this.r - this.r1;  
+          this.steps =0;
+        }    
+      break;   
+    }
+    this.draw(x, y);      
+  }
+  this.draw = function(x, y) {
+    this.path += ` a ${this.r} ${this.r} 0 0 0 ${x / 90 * this.degX} ${y / 90 * this.degY}`;
+    svgChgProp(this.spiralSvg, {
+      d: this.path
+    });
+    parent.menu.textarea.value = "density: " +  this.rExp.toFixed(4) + "\nradius: " + this.r.toFixed(4);    
+  }    
+  this.showButtons = function() {
+       
+  }
+}
+const coord = new Coord(0, 24, 10000, 10000);
+    </script>
+</html>

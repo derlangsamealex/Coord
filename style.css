@@ -1,0 +1,146 @@
+.pickedelement
+ {
+    border-color: red;
+    border-style: groove;
+    border-width: 1px;
+
+}
+.menuButton {
+    background-color: lightgrey;
+    border: 1px ridge grey;
+    text-align: center;
+    font-size: 5px;
+}
+.textbar 
+{
+    background: white;  
+    width: 53px;  
+    height: 23px;
+    font-size: 16px;
+    text-align: left;
+    border-style: groove;
+    border-width: 1px;
+    z-index:0;
+}
+nav 
+{
+    box-sizing: border-box;
+    float: left;
+    width: 100%;
+    background: #3a3a3a;
+    font-size: 12px;
+}
+nav ul
+{
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    background-color: grey;
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: white;
+    font-size: 12px;
+    z-index: 1000;
+}
+nav a
+{
+    display: block;
+    color: #fff;
+    text-decoration: none;   
+}
+nav ul li 
+{
+    position: relative;
+    float: left;
+    list-style: none;
+}
+nav ul li:hover
+{
+    background: #4096ee;
+}
+nav ul li a 
+{
+    padding: 5px;
+}
+nav ul ul 
+{
+    position: absolute;
+    top: 100%;
+    left: 0;
+    display: none;
+    background: #333;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.6);
+}
+nav ul ul ul
+{
+    top: 0;
+    left: 100px;    
+}
+nav ul ul li 
+{
+    float: none;
+    width: 100px;
+    border-bottom: 1px solid #555;
+}
+nav ul ul li a 
+{
+    padding: 5px 10px;
+}
+nav ul li.dropdown > a:after 
+{
+    position: relative;
+    float: right;
+    content: '';
+    margin-left: 10px;
+    margin-top: 5px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #fff;
+    border-bottom: 5px solid transparent;
+}
+nav ul ul li.dropdown a:after 
+{
+    margin-left: auto;
+    margin-right: -10px;
+    border-left: 5px solid #fff;
+    border-right: 5px solid transparent;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+nav ul ul li:last-child 
+{
+    border-bottom: none;
+}
+#zoom {
+    border-left: 1px solid black;  
+    border-right: 1px solid black;
+}
+#mapsize {
+    border-left: 1px solid black;  
+    border-right: 1px solid black; 
+}
+.drawsurface {
+    position:absolute; 
+    top:25px;
+    left:0;
+    width:99%; 
+    height:76%; 
+    border-width:2px; 
+    border-style:groove;
+}
+.submenu {
+    position:absolute; 
+    top:82%; 
+    left:0; 
+    height:18%; 
+    width:100%;  
+    background:darkgrey; 
+    z-index:3;
+}
+.textbox {
+    background: white; 
+    font-size: 10px;
+    text-align: left;
+    border-style: groove;    
+}
